@@ -7,6 +7,7 @@ export default function App() {
   const [currentAccount, setCurrentAccount] = useState("");
   const [allWaves, setAllWaves] = useState([]);
   const [waveText, setWaveText] = useState("");
+  const [loading, setLoading] = useState(false);
   const contractAddress = "0x06A912FC6314BCB80Eb24fa18652AfcafA737AdA";
   const contractABI = abi.abi;
 
@@ -102,8 +103,12 @@ export default function App() {
         });
         console.log("Mining... ", waveTxn.hash);
 
+        setLoading(true);
+
         await waveTxn.wait();
         console.log("Mined ", waveTxn.hash);
+
+        setLoading(false);
 
         count = await wavePortalContract.getTotalWaves();
         console.log("New total wave count...", count.toNumber());
@@ -160,9 +165,6 @@ export default function App() {
     }
   };
 
-  /*
-   * This runs our function when the page loads.
-   */
   useEffect(() => {
     checkIfWalletIsConnected();
   }, []);
@@ -173,19 +175,33 @@ export default function App() {
         <div className="header">👋 Hey there!</div>
 
         <div className="bio">Connect your Ethereum wallet and wave at me!</div>
+        <div className="bio" style={{ color: "red", fontSize: "10px" }}>
+          Use the Rinkeby test network.
+        </div>
 
         {currentAccount ? (
           <>
-            <input
-              type="text"
-              name="name"
-              placeholder="add a message to your wave..."
-              className="textinput"
-              onChange={(e) => setWaveText(e.target.value)}
-            />
-            <button className="waveButton" onClick={wave}>
-              Wave at Me
-            </button>
+            {!loading ? (
+              <>
+                <input
+                  type="text"
+                  name="name"
+                  placeholder="add a message to your wave..."
+                  className="textinput"
+                  onChange={(e) => setWaveText(e.target.value)}
+                />
+                <button className="waveButton" onClick={wave}>
+                  Wave at Me
+                </button>
+              </>
+            ) : (
+              <div className="lds-ring">
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+              </div>
+            )}
           </>
         ) : (
           <button className="waveButton" onClick={connectWallet}>
