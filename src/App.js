@@ -4,14 +4,84 @@ import "./App.css";
 import abi from "./utils/WavePortal.json";
 
 export default function App() {
-  /*
-   * Just a state variable we use to store our user's public wallet.
-   */
   const [currentAccount, setCurrentAccount] = useState("");
-  const contractAddress = "0xac86FAE31ECb65359b0a484Fd7FC1915CFf74f9D";
+  const [allWaves, setAllWaves] = useState([]);
+  const [waveText, setWaveText] = useState("");
+  const contractAddress = "0x06A912FC6314BCB80Eb24fa18652AfcafA737AdA";
   const contractABI = abi.abi;
 
+  const getAllWaves = async () => {
+    try {
+      const { ethereum } = window;
+      if (ethereum) {
+        const provider = new ethers.providers.Web3Provider(ethereum);
+        const signer = provider.getSigner();
+        const wavePortalContract = new ethers.Contract(
+          contractAddress,
+          contractABI,
+          signer
+        );
+
+        const waves = await wavePortalContract.getAllWaves();
+
+        let WavesCleaned = [];
+        waves.forEach((wave) => {
+          WavesCleaned.push({
+            address: wave.waver,
+            timestamp: new Date(wave.timestamp * 1000),
+            message: wave.message,
+          });
+        });
+
+        setAllWaves(WavesCleaned);
+      } else {
+        console.log("Ethereum object doesn't exist!");
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  useEffect(() => {
+    let wavePortalContract;
+
+    const onNewWave = (from, timestamp, message) => {
+      console.log("NewWave", from, timestamp, message);
+      setAllWaves((prevState) => [
+        ...prevState,
+        {
+          address: from,
+          timestamp: new Date(timestamp * 1000),
+          message,
+        },
+      ]);
+    };
+
+    if (window.ethereum) {
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const signer = provider.getSigner();
+
+      wavePortalContract = new ethers.Contract(
+        contractAddress,
+        contractABI,
+        signer
+      );
+      wavePortalContract.on("NewWave", onNewWave);
+    }
+
+    return () => {
+      if (wavePortalContract) {
+        wavePortalContract.off("NewWave", onNewWave);
+      }
+    };
+  }, []);
+
   const wave = async () => {
+    if (waveText === "") {
+      alert("Add some text to your wave!");
+      return;
+    }
+
     try {
       const { ethereum } = window;
 
@@ -27,10 +97,9 @@ export default function App() {
         let count = await wavePortalContract.getTotalWaves();
         console.log("Retrieved total wave count... ", count.toNumber());
 
-        /*
-         * Execute the actual wave from your smart contract
-         */
-        const waveTxn = await wavePortalContract.wave();
+        const waveTxn = await wavePortalContract.wave(waveText, {
+          gasLimit: 300000,
+        });
         console.log("Mining... ", waveTxn.hash);
 
         await waveTxn.wait();
@@ -47,9 +116,6 @@ export default function App() {
   };
 
   const checkIfWalletIsConnected = async () => {
-    /*
-     * First make sure we have access to window.ethereum
-     */
     try {
       const { ethereum } = window;
 
@@ -66,6 +132,7 @@ export default function App() {
         const account = accounts[0];
         console.log("Found an authorized acount: ", account);
         setCurrentAccount(account);
+        getAllWaves();
       } else {
         console.log("No authorized account found");
       }
@@ -74,9 +141,6 @@ export default function App() {
     }
   };
 
-  /**
-   * Implement connectWallet method here
-   */
   const connectWallet = async () => {
     try {
       const { ethereum } = window;
@@ -111,14 +175,40 @@ export default function App() {
         <div className="bio">Connect your Ethereum wallet and wave at me!</div>
 
         {currentAccount ? (
-          <button className="waveButton" onClick={wave}>
-            Wave at Me
-          </button>
+          <>
+            <input
+              type="text"
+              name="name"
+              placeholder="add a message to your wave..."
+              className="textinput"
+              onChange={(e) => setWaveText(e.target.value)}
+            />
+            <button className="waveButton" onClick={wave}>
+              Wave at Me
+            </button>
+          </>
         ) : (
           <button className="waveButton" onClick={connectWallet}>
             Connect Wallet
           </button>
         )}
+
+        {allWaves.map((wave, index) => {
+          return (
+            <div
+              key={index}
+              style={{
+                backgroundColor: "OldLace",
+                marginTop: "16px",
+                padding: "8px",
+              }}
+            >
+              <div>Address: {wave.address}</div>
+              <div>Time: {wave.timestamp.toString()}</div>
+              <div>Message: {wave.message}</div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
